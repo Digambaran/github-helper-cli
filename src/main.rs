@@ -26,14 +26,29 @@ use std::env::{self, Args};
 //     file_names: Vec<String>
 //
 // }
+
+static COMMAND_HELPER_MSG: &str = "
+    GIT HELPER CLI\n
+    list  [filter conditions] list repos as selectable list\n
+    delete \n
+    search \n
+
+    ";
+static LIST_HELPER_MSG: &str = "";
+static DELETE_HELPER_MSG: &str = "";
+static SEARCH_HELPER_MSG: &str = "";
+
 fn handle_list_command(cmd:Args){
+    println!("command is list");
     for (i,v) in cmd.enumerate() {
         println!("{v}")
     }
 }
 fn handle_delete_command(cmd:Args){
+   println!("command is delete");
 }
 fn handle_search_command(cmd:Args){
+   println!("command is search");
 }
 fn main() {
     // let list =Commands::List(String::from("list"));
@@ -42,14 +57,16 @@ fn main() {
     let command = cmd.next().unwrap_or(String::from(""));
     match command.as_str() {
         "list"=>{
-            println!("command is list");
             handle_list_command(cmd)
         },
         "delete"=>{
-            println!("command is delete");
+            handle_delete_command(cmd)
         },
         "search"=>{
-            println!("command is search");
+            handle_search_command(cmd)
+        },
+        "-h"|"--help"=>{
+            println!("{}",COMMAND_HELPER_MSG);
         },
         _=> panic!("command {command} is not available")
     }
