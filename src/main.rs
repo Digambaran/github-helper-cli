@@ -1,5 +1,5 @@
 
-use std::env::{self, Args};
+use std::env::{self};
 /* connect to github, store config data and user token somewhere safe */
 /* program can have one command: search*/
 /* search command can have one option: reponame */
@@ -28,46 +28,104 @@ use std::env::{self, Args};
 // }
 
 static COMMAND_HELPER_MSG: &str = "
-    GIT HELPER CLI\n
-    list  [filter conditions] list repos as selectable list\n
-    delete \n
-    search \n
+    GIT HELPER CLI
+
+Usage: xxx [OPTIONS] [COMMAND] [OPTIONS]
+
+Options:
+  -V, --version     Print version info and exit
+      --verbose     Use verbose output
+      --quite       Do not print messages
+  -h, --help        Print help
+
+Commands:
+  list    [filter conditions] list repos as selectable list
+  delete  <name|id>           delete the repos/repos with the id/name
+  search  <nmae>              similar to list, but not select
 
     ";
-static LIST_HELPER_MSG: &str = "";
-static DELETE_HELPER_MSG: &str = "";
-static SEARCH_HELPER_MSG: &str = "";
 
-fn handle_list_command(cmd:Args){
-    println!("command is list");
-    for (i,v) in cmd.enumerate() {
-        println!("{v}")
+static LIST_HELPER_MSG: &str = "
+    LIST COMMAND
+
+Usage: xxx list [OPTIONS]
+
+Options:
+  --name   name of repo
+  --files  filenames array
+";
+
+static DELETE_HELPER_MSG: &str = "
+    DELETE COMMAND
+";
+
+static SEARCH_HELPER_MSG: &str = "
+    SEARCH COMMAND
+";
+
+
+fn handle_list_command<T:Iterator<Item = String >>(cmd:T)->&'static str{
+    println!("{}",LIST_HELPER_MSG);
+    LIST_HELPER_MSG
+}
+fn handle_delete_command<T: Iterator<Item = String >>(cmd:T)->&'static str{
+    println!("{}",DELETE_HELPER_MSG);
+    DELETE_HELPER_MSG
+}
+
+fn handle_search_command<T:Iterator<Item = String >>(cmd:T)->&'static str{
+   println!("{}",SEARCH_HELPER_MSG);
+   SEARCH_HELPER_MSG 
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{handle_list_command, LIST_HELPER_MSG, handle_search_command, handle_delete_command, SEARCH_HELPER_MSG, DELETE_HELPER_MSG};
+
+    #[test]
+    fn should_show_help_on_verbose() {
+        let help_string_verbose = String::from("--help");
+
+        let list = handle_list_command([help_string_verbose.clone()].into_iter());
+        let search = handle_search_command([help_string_verbose.clone()].into_iter());
+        let delete = handle_delete_command([help_string_verbose.clone()].into_iter());
+
+        assert_eq!(list,LIST_HELPER_MSG);
+        assert_eq!(search,SEARCH_HELPER_MSG);
+        assert_eq!(delete,DELETE_HELPER_MSG);
+    }
+
+    #[test]
+    fn should_show_help_on_short_help() {
+        let help_string_short = String::from("-h");
+
+        let list = handle_list_command([help_string_short.clone()].into_iter());
+        let search = handle_search_command([help_string_short.clone()].into_iter());
+        let delete = handle_delete_command([help_string_short.clone()].into_iter());
+
+        assert_eq!(list,LIST_HELPER_MSG);
+        assert_eq!(search,SEARCH_HELPER_MSG);
+        assert_eq!(delete,DELETE_HELPER_MSG);
     }
 }
-fn handle_delete_command(cmd:Args){
-   println!("command is delete");
-}
-fn handle_search_command(cmd:Args){
-   println!("command is search");
-}
+
 fn main() {
-    // let list =Commands::List(String::from("list"));
     let mut cmd = env::args();
     let _file_name = cmd.next().unwrap_or(String::from(""));
     let command = cmd.next().unwrap_or(String::from(""));
     match command.as_str() {
         "list"=>{
-            handle_list_command(cmd)
+            handle_list_command(cmd);
         },
         "delete"=>{
-            handle_delete_command(cmd)
+            handle_delete_command(cmd);
         },
         "search"=>{
-            handle_search_command(cmd)
+            handle_search_command(cmd);
         },
         "-h"|"--help"=>{
             println!("{}",COMMAND_HELPER_MSG);
         },
-        _=> panic!("command {command} is not available")
+        _=> println!("{}",COMMAND_HELPER_MSG),
     }
 }
