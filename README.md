@@ -6,11 +6,13 @@ The idea here is to create a CLI from which user can search for repositories bas
 [ ] Connect to github via device flow
 [ ] Store token in os specific folders for app data __( preferrably encrypted )__
 [ ] User should be able to select multipl repos and delete
+[ ] by default prevent deletion of repos with commits in previos 7 days - give options in config to change
 
 # Filters
+[ ] User should be able to search and filter based on __commit count ( eq, lt, gt etc..), last commit, last commit between a & b,__
 [ ] Empty - should list all repos ( paginated )
-[ ] Repo name - based on used provided repo name/names __( variadic )__
-[ ] File count - if github api supports file count __( range should also be supported )__
+[ ] Repo name - based on user provided repo name/names __( variadic )__
+[ ] File count - if github api supports file count __( range should also be supported , eq, lt, gt)__
 [ ] File names - based on the file name/names provided by the user.. list repos with files of given name
 [ ] File names regex
 [ ] File names union or intersection __( or / and )__
