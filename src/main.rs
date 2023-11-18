@@ -65,17 +65,47 @@ static SEARCH_HELPER_MSG: &str = "
 
 
 fn handle_list_command<T:Iterator<Item = String >>(cmd:T)->&'static str{
-    println!("{}",LIST_HELPER_MSG);
-    LIST_HELPER_MSG
+    for (_i,v) in cmd.enumerate() {
+        match v.as_str() {
+            "-h"|"--help"=>{
+                println!("{}",LIST_HELPER_MSG);
+                return LIST_HELPER_MSG;
+            },
+            _ => {
+                return "";
+            },
+        }
+    }
+    ""
 }
 fn handle_delete_command<T: Iterator<Item = String >>(cmd:T)->&'static str{
-    println!("{}",DELETE_HELPER_MSG);
-    DELETE_HELPER_MSG
+    for (_i,v) in cmd.enumerate() {
+        match v.as_str() {
+            "-h"|"--help"=>{
+                println!("{}",DELETE_HELPER_MSG);
+                return DELETE_HELPER_MSG;
+            },
+            _ => {
+                return "";
+            },
+        }
+    }
+    ""
 }
 
 fn handle_search_command<T:Iterator<Item = String >>(cmd:T)->&'static str{
-   println!("{}",SEARCH_HELPER_MSG);
-   SEARCH_HELPER_MSG 
+    for (_i,v) in cmd.enumerate() {
+        match v.as_str() {
+            "-h"|"--help"=>{
+                println!("{}",SEARCH_HELPER_MSG);
+                return SEARCH_HELPER_MSG;
+            },
+            _ => {
+                return "";
+            },
+        }
+    }
+    ""
 }
 
 #[cfg(test)]
@@ -110,8 +140,8 @@ mod tests {
 }
 
 fn main() {
-    let mut cmd = env::args();
-    let _file_name = cmd.next().unwrap_or(String::from(""));
+    // skip file name
+    let mut cmd = env::args().skip(1);
     let command = cmd.next().unwrap_or(String::from(""));
     match command.as_str() {
         "list"=>{
