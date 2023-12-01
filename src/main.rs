@@ -113,9 +113,9 @@ fn handle_search_command<T:Iterator<Item = String >>(cmd:T)->&'static str{
 
 #[cfg(test)]
 mod tests {
-    use std::{io, env::VarError};
+    use std::{io, env::{VarError, self}};
 
-    use crate::{handle_list_command, LIST_HELPER_MSG, handle_search_command, handle_delete_command, SEARCH_HELPER_MSG, DELETE_HELPER_MSG, get_config, NO_HOME_ENV_VAR, GetConfigError, GetConfigErrorKind};
+    use crate::{handle_list_command, LIST_HELPER_MSG, handle_search_command, handle_delete_command, SEARCH_HELPER_MSG, DELETE_HELPER_MSG, get_config,  GetConfigError, GetConfigErrorKind, INVALID_HOME_PATH};
 
     #[test]
     fn should_show_help_on_verbose() {
@@ -150,6 +150,14 @@ mod tests {
         assert_eq!(s.kind(),&GetConfigErrorKind::VarError(VarError::NotPresent))
     }
 
+    #[test]
+    fn should_show_unexpected_home_path_error() {
+        env::set_var("testxxxapphome", "/n/b/c");
+        let s = get_config("testxxxapphome").unwrap_err();
+        assert_eq!(s.kind(),&GetConfigErrorKind::WrongHomePath(INVALID_HOME_PATH));
+        env::remove_var("testxxxapphome")
+    }
+
 }
 
 #[derive(Debug, PartialEq)]
@@ -164,15 +172,14 @@ struct  GetConfigError {
     kind: GetConfigErrorKind
 }
 
-// impl Error for GetConfigError {}
 
 impl GetConfigError {
-  pub  fn kind(&self)->&GetConfigErrorKind {
+    fn kind(&self)->&GetConfigErrorKind {
         &self.kind
     }
 }
 
-static NO_HOME_ENV_VAR: &str = "HOME variable not set in env or error reading it";
+
 impl Display for GetConfigError {
     fn fmt (&self, f: &mut Formatter)->fmt::Result{
         match &self.kind {
@@ -183,10 +190,10 @@ impl Display for GetConfigError {
     }
 }   
 
-impl From<io::ErrorKind> for GetConfigError {
+impl From<io::Error> for GetConfigError {
     // from is useful to use ?, which calls from to convert err from io::Error to my type
-    fn from(err:io::ErrorKind) -> Self {
-        GetConfigError { kind: GetConfigErrorKind::CreateError(err) }
+    fn from(err:io::Error) -> Self {
+        GetConfigError { kind: GetConfigErrorKind::CreateError(err.kind()) }
     }
 }
 
@@ -210,20 +217,17 @@ struct AppConfig {
 static INVALID_HOME_PATH: &'static str = "Expected home to be /home/<something>";
 
 fn get_config(key:&str)->Result<AppConfig,GetConfigError>{
-    let home_path_from_env = env::var(key)?;
-    println!("{}",home_path_from_env);
-    // if let Err(x) = home_path_from_env {
-        // return Err(NO_HOME_ENV_VAR);
-    // }
-    if !Path::new(&home_path_from_env).starts_with("/home/") {
+    let home_path_from_env:String= env::var(key)?;
+
+    if !home_path_from_env.starts_with("/home/") {
        return Err(INVALID_HOME_PATH.into())
     } 
-    // let path_buf = PathBuf::new().join(v).join(".abc").join("xxxApp");
-    // fs::read(path_buf);
-    // let x:Result<(), io::Error> = create_dir_all(path_buf)
-    // if let Err(err) = create_dir_all(path_buf) {
-    // }
-  Ok(AppConfig { git_token: String::from("45") })
+    let config_path = Path::new(&home_path_from_env).join(".abc").join("xxxApp").join("config.toml");
+    // std::fs::read(config_path)?;
+    // Read the config here, if config is present
+    // build an Appconfig and return its reference back to fn main()
+    std::fs::create_dir_all(config_path)?;
+    Ok(AppConfig { git_token: String::from("45") })
             
 }
 
@@ -236,6 +240,7 @@ fn main() {
         println!("{}",s);
         return
     }
+    println!("{:?}",x);
     match command.as_str() {
         "list"=>{
             handle_list_command(cmd);
