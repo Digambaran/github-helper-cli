@@ -230,7 +230,7 @@ fn get_config(key:&str)->Result<AppConfig,GetConfigError>{
     Ok(AppConfig { git_token: String::from("45") })
             
 }
-
+// TODO - learn and implement builder pattern here
 fn main() {
     // skip file name
     let mut cmd = env::args().skip(1);
