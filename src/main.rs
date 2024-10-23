@@ -1,12 +1,10 @@
-use core::num;
-use std::alloc::System;
-use std::error::Error;
+use std::env;
 use std::fmt::{self, Display, Formatter};
-use std::io::{self, Read};
-use std::path::{Path, PathBuf};
-use std::{env, os};
+use std::io;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use serde_json::error;
 
 pub mod strs;
 /* connect to github, store config data and user token somewhere safe */
@@ -86,6 +84,7 @@ fn handle_list_command<T: Iterator<Item = String>>(cmd: T) -> &'static str {
     }
     ""
 }
+
 fn handle_delete_command<T: Iterator<Item = String>>(cmd: T) -> &'static str {
     for (_i, v) in cmd.enumerate() {
         match v.as_str() {
@@ -118,15 +117,11 @@ fn handle_search_command<T: Iterator<Item = String>>(cmd: T) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        env::{self, VarError},
-        io,
-    };
+    use std::env::{self, VarError};
 
     use crate::{
-        get_config, handle_delete_command, handle_list_command, handle_search_command,
-        strs::INVALID_HOME_PATH, GetConfigError, GetConfigErrorKind, DELETE_HELPER_MSG,
-        LIST_HELPER_MSG, SEARCH_HELPER_MSG,
+        handle_delete_command, handle_list_command, handle_search_command, strs::INVALID_HOME_PATH,
+        GetConfigErrorKind, DELETE_HELPER_MSG, LIST_HELPER_MSG, SEARCH_HELPER_MSG,
     };
 
     #[test]
@@ -184,7 +179,7 @@ enum Oses {
 #[derive(Debug, PartialEq)]
 enum GetConfigErrorKind {
     VarError(env::VarError),
-    CreateError(io::ErrorKind),
+    CreateError(std::io::ErrorKind),
     WrongHomePath(&'static str),
 }
 
@@ -241,7 +236,7 @@ impl From<&'static str> for GetConfigError {
 }
 
 impl From<serde_json::Error> for GetConfigError {
-    fn from(err: serde_json::Error) -> Self {
+    fn from(_err: serde_json::Error) -> Self {
         GetConfigError {
             kind: GetConfigErrorKind::WrongHomePath(""),
         }
@@ -272,7 +267,7 @@ fn get_config_two() -> Result<AppConfig, GetConfigError> {
              * If user is in linux platform, store the git token in home
              * expect a return of "/home"
              */
-            if let Some(p) = env::var_os(strs::LINUX_APP_PATH_ENV) {
+            if let Some(_p) = env::var_os(strs::LINUX_APP_PATH_ENV) {
                 Ok(AppConfig {
                     git_token: String::new(),
                 })
@@ -296,7 +291,7 @@ fn read_config(app_data_path: std::ffi::OsString) -> Result<AppConfig, GetConfig
     let fopen = std::fs::File::open(&config_path);
     match fopen {
         Ok(file_buf) => {
-            let buff = io::BufReader::new(file_buf);
+            let buff = std::io::BufReader::new(file_buf);
             let json_r: Result<AppConfig, serde_json::Error> = serde_json::from_reader(buff);
             match json_r {
                 Ok(json) => {
@@ -304,13 +299,23 @@ fn read_config(app_data_path: std::ffi::OsString) -> Result<AppConfig, GetConfig
                     println!("{:?}", json);
                     println!("{:?}", json.git_token);
                 }
-                Err(e) => {}
+                Err(e) => match e.classify() {
+                    serde_json::error::Category::Eof => {
+                        println!("eof error {:?}", e);
+                    }
+                    serde_json::error::Category::Io => {
+                        println!("IO error {:?}", e);
+                    }
+                    _ => {
+                        println!("bad")
+                    }
+                },
             }
         }
         Err(er) => {
-            println!("HERE");
+            println!("{:?}", er);
             std::fs::create_dir_all(config_folder)?;
-            std::fs::File::create(config_path);
+            std::fs::File::create(config_path)?;
             return Err(strs::COULDNT_READ_APPDATA.into());
         }
     }
