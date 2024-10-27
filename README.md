@@ -2,6 +2,11 @@
 
 The idea here is to create a CLI from which user can search for repositories based on filter conditions and delete them if they want to.
 
+# Todos
+[ ] check if config is present and readable, else show "corrupted config, please fix"
+[ ] check if present token is valid, else show message and prompt for new token
+[ ] 
+
 # Plans
 [ ] Connect to github via device flow
 [ ] Store token in os specific folders for app data __( preferrably encrypted )__

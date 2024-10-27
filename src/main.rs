@@ -4,7 +4,6 @@ use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use serde_json::error;
 
 pub mod strs;
 /* connect to github, store config data and user token somewhere safe */
@@ -181,6 +180,7 @@ enum GetConfigErrorKind {
     VarError(env::VarError),
     CreateError(std::io::ErrorKind),
     WrongHomePath(&'static str),
+    SerdeError(serde_json::error::Category),
 }
 
 #[derive(Debug)]
@@ -206,6 +206,17 @@ impl Display for GetConfigError {
                 "I tried creating a folder in this path and got this error\nIoError: {e}"
             ),
             GetConfigErrorKind::WrongHomePath(e) => write!(f, "{e}"),
+            GetConfigErrorKind::SerdeError(e) => match e {
+                serde_json::error::Category::Eof => {
+                    return write!(f, "config json eof error");
+                }
+                serde_json::error::Category::Io => {
+                    return write!(f, "config json IO error");
+                }
+                _ => {
+                    return write!(f, "bad");
+                }
+            },
         }
     }
 }
@@ -236,9 +247,9 @@ impl From<&'static str> for GetConfigError {
 }
 
 impl From<serde_json::Error> for GetConfigError {
-    fn from(_err: serde_json::Error) -> Self {
+    fn from(err: serde_json::Error) -> Self {
         GetConfigError {
-            kind: GetConfigErrorKind::WrongHomePath(""),
+            kind: GetConfigErrorKind::SerdeError(err.classify()),
         }
     }
 }
@@ -258,9 +269,8 @@ fn get_config_two() -> Result<AppConfig, GetConfigError> {
              */
             if let Some(app_data_path) = env::var_os(strs::WINDOWS_APP_PATH_ENV) {
                 return read_config(app_data_path);
-            } else {
-                return Err(strs::COULDNT_READ_APPDATA.into());
             }
+            Err(strs::COULDNT_READ_APPDATA.into())
         }
         "linux" => {
             /*
@@ -268,18 +278,26 @@ fn get_config_two() -> Result<AppConfig, GetConfigError> {
              * expect a return of "/home"
              */
             if let Some(_p) = env::var_os(strs::LINUX_APP_PATH_ENV) {
-                Ok(AppConfig {
+                return Ok(AppConfig {
                     git_token: String::new(),
-                })
-            } else {
-                return Err(strs::COULDNT_READ_HOME.into());
-            }
+                });
+            };
+            Err(strs::COULDNT_READ_HOME.into())
         }
         _ => {
             println!("No, OS is not supported!");
-            return Err(strs::COULDNT_READ_APPDATA.into());
+            Err(strs::COULDNT_READ_APPDATA.into())
         }
     }
+}
+
+fn parse_json(arg: std::fs::File) -> Result<AppConfig, GetConfigError> {
+    let buff = std::io::BufReader::new(arg);
+    let json_r: Result<AppConfig, serde_json::Error> = serde_json::from_reader(buff);
+    let Ok(json) = json_r else {
+        return Err(json_r.err().unwrap().into());
+    };
+    Ok(json)
 }
 
 fn read_config(app_data_path: std::ffi::OsString) -> Result<AppConfig, GetConfigError> {
@@ -288,41 +306,24 @@ fn read_config(app_data_path: std::ffi::OsString) -> Result<AppConfig, GetConfig
     let config_path = config_folder.join("config.json");
 
     // try reading config
-    let fopen = std::fs::File::open(&config_path);
-    match fopen {
-        Ok(file_buf) => {
-            let buff = std::io::BufReader::new(file_buf);
-            let json_r: Result<AppConfig, serde_json::Error> = serde_json::from_reader(buff);
-            match json_r {
-                Ok(json) => {
-                    println!("HERE");
-                    println!("{:?}", json);
-                    println!("{:?}", json.git_token);
-                }
-                Err(e) => match e.classify() {
-                    serde_json::error::Category::Eof => {
-                        println!("eof error {:?}", e);
-                    }
-                    serde_json::error::Category::Io => {
-                        println!("IO error {:?}", e);
-                    }
-                    _ => {
-                        println!("bad")
-                    }
-                },
-            }
-        }
-        Err(er) => {
-            println!("{:?}", er);
-            std::fs::create_dir_all(config_folder)?;
-            std::fs::File::create(config_path)?;
-            return Err(strs::COULDNT_READ_APPDATA.into());
-        }
+    let Ok(file_buf) = std::fs::File::open(&config_path) else {
+        std::fs::create_dir_all(config_folder)?;
+        std::fs::File::create(config_path)?;
+        return Err(strs::COULDNT_READ_APPDATA.into());
+    };
+
+    let parsed_json = parse_json(file_buf);
+
+    match parsed_json {
+        Ok(json) => Ok(AppConfig {
+            git_token: json.git_token,
+        }),
+        Err(e) => Err(e.into()),
     }
 
-    Ok(AppConfig {
-        git_token: String::new(),
-    })
+    // Ok(AppConfig {
+    //     git_token: String::new(),
+    // })
 }
 
 // TODO - learn and implement builder pattern here
