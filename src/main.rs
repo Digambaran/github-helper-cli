@@ -119,8 +119,9 @@ mod tests {
     use std::env::{self, VarError};
 
     use crate::{
-        handle_delete_command, handle_list_command, handle_search_command, strs::INVALID_HOME_PATH,
-        GetConfigErrorKind, DELETE_HELPER_MSG, LIST_HELPER_MSG, SEARCH_HELPER_MSG,
+        get_config_two, handle_delete_command, handle_list_command, handle_search_command,
+        strs::INVALID_HOME_PATH, GetConfigErrorKind, DELETE_HELPER_MSG, LIST_HELPER_MSG,
+        SEARCH_HELPER_MSG,
     };
 
     #[test]
@@ -151,7 +152,7 @@ mod tests {
 
     #[test]
     fn should_show_env_var_error() {
-        let s = get_config("lopplslslslslsl").unwrap_err();
+        let s = get_config_two("lopplslslslslsl").unwrap_err();
         assert_eq!(
             s.kind(),
             &GetConfigErrorKind::VarError(VarError::NotPresent)
@@ -161,7 +162,7 @@ mod tests {
     #[test]
     fn should_show_unexpected_home_path_error() {
         env::set_var("testxxxapphome", "/n/b/c");
-        let s = get_config("testxxxapphome").unwrap_err();
+        let s = get_config_two("testxxxapphome").unwrap_err();
         assert_eq!(
             s.kind(),
             &GetConfigErrorKind::WrongHomePath(INVALID_HOME_PATH)
@@ -259,7 +260,7 @@ struct AppConfig {
     git_token: String,
 }
 
-fn get_config_two() -> Result<AppConfig, GetConfigError> {
+fn get_path_to_config_file() -> Result<String, GetConfigError> {
     // let app_path_folder_path: Path;
     match env::consts::OS {
         "windows" => {
@@ -268,7 +269,7 @@ fn get_config_two() -> Result<AppConfig, GetConfigError> {
              * expect a return of "C:\Users\<username>\AppData\Roaming"
              */
             if let Some(app_data_path) = env::var_os(strs::WINDOWS_APP_PATH_ENV) {
-                return read_config(app_data_path);
+                return Ok(app_data_path.into_string().unwrap());
             }
             Err(strs::COULDNT_READ_APPDATA.into())
         }
@@ -278,9 +279,7 @@ fn get_config_two() -> Result<AppConfig, GetConfigError> {
              * expect a return of "/home"
              */
             if let Some(_p) = env::var_os(strs::LINUX_APP_PATH_ENV) {
-                return Ok(AppConfig {
-                    git_token: String::new(),
-                });
+                return Ok(_p.into_string().unwrap());
             };
             Err(strs::COULDNT_READ_HOME.into())
         }
@@ -300,44 +299,75 @@ fn parse_json(arg: std::fs::File) -> Result<AppConfig, GetConfigError> {
     Ok(json)
 }
 
-fn read_config(app_data_path: std::ffi::OsString) -> Result<AppConfig, GetConfigError> {
-    let config_folder =
-        Path::new(&app_data_path.to_str().unwrap_or("default")).join(strs::APP_FOLDER_NAME);
-    let config_path = config_folder.join("config.json");
-
-    // try reading config
-    let Ok(file_buf) = std::fs::File::open(&config_path) else {
-        std::fs::create_dir_all(config_folder)?;
-        std::fs::File::create(config_path)?;
-        return Err(strs::COULDNT_READ_APPDATA.into());
-    };
-
-    let parsed_json = parse_json(file_buf);
-
-    match parsed_json {
-        Ok(json) => Ok(AppConfig {
-            git_token: json.git_token,
-        }),
-        Err(e) => Err(e.into()),
-    }
-
-    // Ok(AppConfig {
-    //     git_token: String::new(),
-    // })
-}
-
 // TODO - learn and implement builder pattern here
 fn main() {
     // skip file name
     let mut cmd = env::args().skip(1);
     let command = cmd.next().unwrap_or(String::from(""));
-    let x = get_config_two();
 
-    if let Err(s) = x {
-        println!("{}", s);
+    // get the config folder path for os
+    let config_file_path = get_path_to_config_file().map_or_else(
+        |e| {
+            println!("{}", e);
+            return String::new();
+        },
+        |v| return v,
+    );
+
+    // empty string, from error, so stop program
+    if config_file_path.len() == 0 {
         return;
     }
-    println!("{:?}", x);
+
+    // check if folder and file exists
+    let config_folder = Path::new(&config_file_path).join(strs::APP_FOLDER_NAME);
+    let config_path = config_folder.join(strs::APP_CONFIG_FILE_NAME);
+
+    // check if folder and file exists
+    let config_file_exists = config_path.try_exists().map_or_else(
+        |e| {
+            println!("{:?}", e);
+            false
+        },
+        |v| v,
+    );
+
+    // if doesn't exist create new
+    if !config_file_exists {
+        let config_folder_created = std::fs::create_dir_all(&config_path).map_or_else(
+            |e| {
+                println!("{:?}", e);
+                false
+            },
+            |_| true,
+        );
+        if !config_folder_created {
+            println!("Error while trying to create config folder");
+            return;
+        }
+        // to prevent serde eof error, we will fill it with some value
+        // since it was okay to create, writing wont be an issue
+        let config_initial_written = std::fs::write(&config_path, "{\"initial\":\"true\"}")
+            .map_or_else(
+                |e| {
+                    println!("{:?}", e);
+                    false
+                },
+                |v| {
+                    println!("{:?}", v);
+                    true
+                },
+            );
+        if !config_initial_written {
+            println!("Error trying to write to config.json");
+            return;
+        }
+    }
+
+    // at this point, the config.json surely exists
+    let json = parse_json(std::fs::File::open(&config_path).unwrap()).unwrap();
+
+    println!("{:?}", json);
     match command.as_str() {
         "list" => {
             handle_list_command(cmd);

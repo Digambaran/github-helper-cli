@@ -5,3 +5,4 @@ pub(crate) static WINDOWS_APP_PATH_ENV: &'static str = "APPDATA";
 pub(crate) static LINUX_APP_PATH_ENV: &'static str = "HOME";
 pub(crate) static APP_NAME: &'static str = "githelper";
 pub(crate) static APP_FOLDER_NAME: &'static str = ".githelper";
+pub(crate) static APP_CONFIG_FILE_NAME: &'static str = "config.json";
