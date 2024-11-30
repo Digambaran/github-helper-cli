@@ -1,8 +1,10 @@
-use std::env;
 use std::fmt::{self, Display, Formatter};
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
+use std::{env, string};
 
+use dialoguer::Input;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 pub mod strs;
@@ -260,6 +262,11 @@ struct AppConfig {
     git_token: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct InitalConfig {
+    initial: String,
+}
+
 fn get_path_to_config_file() -> Result<String, GetConfigError> {
     // let app_path_folder_path: Path;
     match env::consts::OS {
@@ -290,16 +297,24 @@ fn get_path_to_config_file() -> Result<String, GetConfigError> {
     }
 }
 
-fn parse_json(arg: std::fs::File) -> Result<AppConfig, GetConfigError> {
+fn parse_json<T: DeserializeOwned>(arg: std::fs::File) -> Result<T, GetConfigError> {
     let buff = std::io::BufReader::new(arg);
-    let json_r: Result<AppConfig, serde_json::Error> = serde_json::from_reader(buff);
+    let json_r: Result<T, serde_json::Error> = serde_json::from_reader(buff);
     let Ok(json) = json_r else {
         return Err(json_r.err().unwrap().into());
     };
     Ok(json)
 }
 
-// TODO - learn and implement builder pattern here
+fn get_token() -> String {
+    let token = Input::<String>::new()
+        .with_prompt("Enter github token")
+        .interact_text()
+        .unwrap();
+    return token;
+}
+
+// TODO: - learn and implement builder pattern here
 fn main() {
     // skip file name
     let mut cmd = env::args().skip(1);
@@ -332,9 +347,10 @@ fn main() {
         |v| v,
     );
 
+    println!("{:?}", config_file_exists);
     // if doesn't exist create new
     if !config_file_exists {
-        let config_folder_created = std::fs::create_dir_all(&config_path).map_or_else(
+        let config_folder_created = std::fs::create_dir_all(&config_folder).map_or_else(
             |e| {
                 println!("{:?}", e);
                 false
@@ -365,9 +381,19 @@ fn main() {
     }
 
     // at this point, the config.json surely exists
-    let json = parse_json(std::fs::File::open(&config_path).unwrap()).unwrap();
+    if !config_file_exists {
+        // let json: InitalConfig = parse_json(std::fs::File::open(&config_path).unwrap()).unwrap();
+        let token = get_token();
+        std::fs::write(
+            &config_path,
+            format!("{{\"git_token\":\"{token}\"}}").as_str(),
+        )
+        .unwrap();
+    } else {
+        let json: AppConfig = parse_json(std::fs::File::open(&config_path).unwrap()).unwrap();
+        println!("{:?}", json);
+    }
 
-    println!("{:?}", json);
     match command.as_str() {
         "list" => {
             handle_list_command(cmd);
